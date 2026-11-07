@@ -1,0 +1,16 @@
+.git
+.claude
+.env
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+backend
+mock-api
+*.pdf
+*.docx
+*.tex
+resume*
+work
+outputs
+ml/data/

@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-routewise}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  backend:
+    build:
+      context: .
+      dockerfile: backend_go/Dockerfile
+      target: app
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-routewise}?sslmode=disable
+      SECRET_KEY: ${SECRET_KEY:?Set a random SECRET_KEY in .env}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_URL: /api
+      API_PROXY_TARGET: http://backend:8000
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0 --port 4000
+volumes:
+  postgres_data:
