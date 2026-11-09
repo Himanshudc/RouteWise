@@ -1,4 +1,5 @@
 import {
+LayoutDashboard,
 LogOut,
 MapPin,
 Ship,
@@ -14,6 +15,7 @@ type UserRole = 'admin' | 'customer';
 
 const NAV_ITEMS = [
   {path:'/track',label:'Track Shipment',icon:MapPin,roles:['admin','customer'] as UserRole[]},
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] as UserRole[] },
   { path: '/shipments', label: 'Shipments', icon: Truck, roles: ['admin'] as UserRole[] },
   { path: '/customers', label: 'Customers', icon: Users, roles: ['admin'] as UserRole[] },
   { path: '/carriers', label: 'Carriers', icon: Ship, roles: ['admin'] as UserRole[] },

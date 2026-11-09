@@ -19,8 +19,8 @@ import { Card,CardBody,CardHeader } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../context/AuthContext';
 import { shipmentsApi } from '../services/api';
-import type { ShipmentDetail,ShipmentStatus } from '../types';
-import { cn,formatDateTime,getPriorityBadgeClass,getPriorityLabel,getStatusBadgeClass,getStatusLabel } from '../utils/helpers';
+import type { PredictionResponse,ShipmentDetail,ShipmentStatus } from '../types';
+import { cn,formatDateTime,getPriorityBadgeClass,getPriorityLabel,getRiskColor,getStatusBadgeClass,getStatusLabel } from '../utils/helpers';
 
 const STATUS_STEPS: { key: ShipmentStatus; label: string; icon: typeof Truck }[] = [
   { key: 'processing', label: 'Processing', icon: Package },
@@ -36,6 +36,7 @@ export function ShipmentDetail() {
   const { id } = useParams<{ id: string }>();
 
   const [shipment, setShipment] = useState<ShipmentDetail | null>(null);
+  const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showStatusUpdate, setShowStatusUpdate] = useState(false);
@@ -51,8 +52,14 @@ export function ShipmentDetail() {
     if (!id) return;
     try {
       setIsLoading(true);
-      const { data } = await shipmentsApi.get(parseInt(id));
-      setShipment(data);
+      const [shipmentRes, predictionRes] = await Promise.all([
+        shipmentsApi.get(parseInt(id)),
+        shipmentsApi.getPrediction(parseInt(id)).catch(() => null),
+      ]);
+      setShipment(shipmentRes.data);
+      if (predictionRes?.data) {
+        setPrediction(predictionRes.data);
+      }
       setError(null);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load shipment');
@@ -160,9 +167,9 @@ export function ShipmentDetail() {
       )}
 
       {/* Main Info Cards */}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Shipment Info */}
-        <Card className="">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -185,9 +192,9 @@ export function ShipmentDetail() {
                   <MapPin className="w-6 h-6 text-primary-600" />
                   <div>
                     <p className="font-medium text-gray-900">{shipment.route.origin}</p>
-                    <p className="text-sm text-gray-500">→ {shipment.route.destination}</p>
+                    <p className="text-sm text-gray-500">â†’ {shipment.route.destination}</p>
                     <p className="text-xs text-gray-400 mt-1">
-                      {shipment.route.distance_km} km • {shipment.route.estimated_hours}h estimated
+                      {shipment.route.distance_km} km â€¢ {shipment.route.estimated_hours}h estimated
                     </p>
                   </div>
                 </div>
@@ -266,6 +273,57 @@ export function ShipmentDetail() {
           </CardBody>
         </Card>
 
+        {/* Right: Risk Prediction */}
+        <Card>
+          <CardHeader>
+            <h3 className="font-semibold text-gray-900">Delay Risk</h3>
+          </CardHeader>
+          <CardBody>
+            {prediction ? (
+              <div className="space-y-4">
+                {/* Risk Level Display */}
+                <div
+                  className={cn(
+                    'p-6 rounded-lg text-center',
+                    prediction.risk_level === 'HIGH' && 'bg-danger-50',
+                    prediction.risk_level === 'MEDIUM' && 'bg-warning-50',
+                    prediction.risk_level === 'LOW' && 'bg-success-50'
+                  )}
+                >
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Current Risk</p>
+                  <p
+                    className="text-4xl font-bold"
+                    style={{ color: getRiskColor(prediction.risk_level) }}
+                  >
+                    {prediction.risk_level}
+                  </p>
+                  <p className="text-2xl font-semibold mt-1" style={{ color: getRiskColor(prediction.risk_level) }}>
+                    Rule-based assessment
+                  </p>
+                </div>
+
+                {/* Reasons */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Why?</h4>
+                  <ul className="space-y-2">
+                    {prediction.reasons.map((reason, index) => (
+                      <li key={index} className="flex items-start gap-2 text-sm text-gray-600">
+                        <span className="w-1.5 h-1.5 rounded-full mt-1.5" style={{ backgroundColor: getRiskColor(prediction.risk_level) }} />
+                        {reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <AlertTriangle className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+                <p>No prediction available</p>
+                <p className="text-xs mt-1">Predictions only for in-transit shipments</p>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
 
       {/* Status Timeline */}
@@ -323,7 +381,7 @@ export function ShipmentDetail() {
                     {(eventLocation || eventDesc) && (
                       <p className="text-sm text-gray-400 mt-0.5">
                         {eventLocation && <span className="font-medium">{eventLocation}</span>}
-                        {eventLocation && eventDesc && <span className="mx-1">•</span>}
+                        {eventLocation && eventDesc && <span className="mx-1">â€¢</span>}
                         {eventDesc && <span>{eventDesc}</span>}
                       </p>
                     )}

@@ -3,6 +3,7 @@ package services
 import (
 	"routewise/internal/models"
 	"testing"
+	"time"
 )
 
 func TestAllStatusTransitions(t *testing.T) {
@@ -24,5 +25,30 @@ func TestAllStatusTransitions(t *testing.T) {
 
 	if svc.ValidateTransition("unknown", models.StatusDelivered) {
 		t.Fatal("unknown status accepted")
+	}
+}
+
+func TestShipmentRiskUsesDeliveryDeadline(t *testing.T) {
+	now := time.Now()
+	for _, tc := range []struct {
+		name               string
+		elapsed, remaining time.Duration
+		status             models.ShipmentStatus
+		want               string
+	}{
+		{"on schedule", time.Hour, 12 * time.Hour, models.StatusInTransit, "LOW"},
+		{"past estimate", 12 * time.Hour, 4 * time.Hour, models.StatusInTransit, "MEDIUM"},
+		{"approaching deadline", time.Hour, time.Hour, models.StatusInTransit, "MEDIUM"},
+		{"overdue", time.Hour, -time.Hour, models.StatusInTransit, "HIGH"},
+		{"marked delayed", time.Hour, 4 * time.Hour, models.StatusDelayed, "HIGH"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sh := &models.Shipment{Status: tc.status, ExpectedDelivery: now.Add(tc.remaining),
+				Route: &models.Route{EstimatedHours: 10}, Carrier: &models.Carrier{},
+				Events: []models.ShipmentEvent{{Status: models.StatusDispatched, Timestamp: now.Add(-tc.elapsed)}}}
+			if got := (&ShipmentService{}).score(sh).RiskLevel; got != tc.want {
+				t.Fatalf("risk = %s, want %s", got, tc.want)
+			}
+		})
 	}
 }

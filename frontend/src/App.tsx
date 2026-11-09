@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Navigate,Route,Routes } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -11,6 +11,7 @@ import { ShipmentDetail } from './pages/ShipmentDetail';
 import { Shipments } from './pages/Shipments';
 import { Tracking } from './pages/Tracking';
 
+const Dashboard = lazy(() => import('./pages/Dashboard').then(({ Dashboard }) => ({ default: Dashboard })));
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { isAuthenticated, isAdmin, isLoading } = useAuth();
@@ -34,7 +35,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
   return <>{children}</>;
 }
 
-function HomeRedirect() { const { isAdmin } = useAuth(); return <Navigate to={isAdmin ? "/shipments" : "/track"} replace />; }
+function HomeRedirect() { const { isAdmin } = useAuth(); return <Navigate to={isAdmin ? "/dashboard" : "/track"} replace />; }
 
 function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -74,6 +75,7 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <Routes>
+                <Route path="/dashboard" element={<ProtectedRoute adminOnly><Suspense fallback={<p role="status">Loading dashboard…</p>}><Dashboard /></Suspense></ProtectedRoute>} />
                 <Route path="/shipments" element={<ProtectedRoute adminOnly><Shipments /></ProtectedRoute>} />
                 <Route path="/shipments/:id" element={<ProtectedRoute adminOnly><ShipmentDetail /></ProtectedRoute>} />
                 <Route path="/customers" element={<ProtectedRoute adminOnly><Customers /></ProtectedRoute>} />

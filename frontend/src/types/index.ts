@@ -159,6 +159,10 @@ export interface ShipmentListItem {
   created_at: string;
   expected_delivery: string;
   actual_delivery?: string;
+  risk_level?: 'LOW' | 'MEDIUM' | 'HIGH';
+  risk_probability?: number;
+  risk_method?: 'rules';
+  risk_reasons?: string[];
 }
 
 export interface ShipmentDetail extends ShipmentListItem {
@@ -192,6 +196,7 @@ export interface ShipmentFilters {
   search?: string;
   status?: ShipmentStatus;
   carrier_id?: number;
+  risk_level?: 'LOW' | 'MEDIUM' | 'HIGH';
   page?: number;
   page_size?: number;
 }
@@ -202,4 +207,48 @@ export interface PaginatedResponse<T> {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+// Prediction
+export interface PredictionResponse {
+  method: 'rules';
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+  probability: number;
+  reasons: string[];
+}
+
+// Dashboard
+export interface DashboardSummary {
+  total_shipments: number;
+  in_transit: number;
+  delivered_today: number;
+  delayed: number;
+}
+
+export interface RiskSummary {
+  high: number;
+  medium: number;
+  low: number;
+}
+
+export interface ChartDataPoint {
+  label: string;
+  value: number;
+}
+
+export interface StatusDistributionChart {
+  data: ChartDataPoint[];
+}
+
+export interface PerformanceChart {
+  labels: string[];
+  on_time_rates: number[];
+}
+
+export interface CarrierPerformanceChart {
+  data: ChartDataPoint[];
+}
+
+export interface RiskDistributionChart {
+  data: ChartDataPoint[];
 }

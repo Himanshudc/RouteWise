@@ -84,8 +84,27 @@ export function getPriorityBadgeClass(priority: string): string {
   return classes[priority] || 'badge-gray';
 }
 
+export function getRiskBadgeClass(riskLevel: string): string {
+  const classes: Record<string, string> = {
+    HIGH: 'badge-danger',
+    MEDIUM: 'badge-warning',
+    LOW: 'badge-success',
+  };
+  return classes[riskLevel] || 'badge-gray';
+}
 
+export function getRiskLabel(riskLevel: string): string {
+  return riskLevel;
+}
 
+export function getRiskColor(riskLevel: string): string {
+  const colors: Record<string, string> = {
+    HIGH: '#ef4444',
+    MEDIUM: '#f59e0b',
+    LOW: '#10b981',
+  };
+  return colors[riskLevel] || '#64748b';
+}
 
 export function truncate(text: string, length: number): string {
   if (text.length <= length) return text;

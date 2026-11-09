@@ -14,7 +14,7 @@ import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow } from '../com
 import { useAuth } from '../context/AuthContext';
 import { carriersApi,customersApi,routesApi,shipmentsApi } from '../services/api';
 import type { Carrier,Customer,Route,ShipmentFilters,ShipmentListItem,ShipmentStatus } from '../types';
-import { formatDate,getPriorityBadgeClass,getPriorityLabel,getStatusBadgeClass,getStatusLabel } from '../utils/helpers';
+import { formatDate,getPriorityBadgeClass,getPriorityLabel,getRiskBadgeClass,getRiskLabel,getStatusBadgeClass,getStatusLabel } from '../utils/helpers';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -27,6 +27,12 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const RISK_OPTIONS = [
+  { value: '', label: 'All Risk Levels' },
+  { value: 'HIGH', label: 'High' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'LOW', label: 'Low' },
+];
 
 export function Shipments() {
   const { isAdmin } = useAuth();
@@ -47,6 +53,7 @@ export function Shipments() {
     search: '',
     status: (searchParams.get('status') as ShipmentStatus) || undefined,
     carrier_id: undefined,
+    risk_level: (searchParams.get('risk_level') as 'LOW' | 'MEDIUM' | 'HIGH') || undefined,
     page: 1,
     page_size: 20,
   });
@@ -227,6 +234,13 @@ export function Shipments() {
                 className="w-48"
               />
 
+              <Select
+                options={RISK_OPTIONS}
+                value={filters.risk_level || ''}
+                onChange={(e) => handleFilterChange('risk_level', e.target.value || undefined)}
+                placeholder="All Risk Levels"
+                className="w-40"
+              />
             </div>
           </div>
         </CardBody>
@@ -259,6 +273,7 @@ export function Shipments() {
                       <TableHead className="hidden sm:table-cell">Priority</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="hidden lg:table-cell">Expected</TableHead>
+                      <TableHead>Risk</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -304,6 +319,13 @@ export function Shipments() {
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-gray-500 text-sm">
                           {formatDate(shipment.expected_delivery)}
+                        </TableCell>
+                        <TableCell>
+                          {shipment.risk_level && (
+                            <Badge variant={getRiskBadgeClass(shipment.risk_level).replace('badge-', '') as any}>
+                              {getRiskLabel(shipment.risk_level)}
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <ChevronRight className="w-4 h-4 text-gray-400 mx-auto" />

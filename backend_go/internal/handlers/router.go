@@ -25,6 +25,7 @@ func NewRouter(db *sql.DB) http.Handler {
 	carriers := services.NewCarrierService(db)
 	routes := services.NewRouteService(db)
 	shipments := services.NewShipmentService(db)
+	dashboard := services.NewDashboardService(db)
 	mux := http.NewServeMux()
 	admin := func(pattern string, handler http.HandlerFunc) {
 		mux.Handle(pattern, middleware.JWTAuth(middleware.AdminOnly(handler)))
@@ -283,7 +284,7 @@ func NewRouter(db *sql.DB) http.Handler {
 			"id": sh.ID, "tracking_number": sh.TrackingNumber, "status": sh.Status, "priority": sh.Priority,
 			"route": sh.Route, "carrier": map[string]string{"name": sh.Carrier.Name, "code": sh.Carrier.Code},
 			"package_weight": sh.PackageWeight, "expected_delivery": sh.ExpectedDelivery, "actual_delivery": sh.ActualDelivery,
-			"created_at": sh.CreatedAt, "events": sh.Events,
+			"created_at": sh.CreatedAt, "events": sh.Events, "risk_level": sh.RiskLevel, "risk_reasons": sh.RiskReasons,
 		}, 200)
 	}
 	outer := http.NewServeMux()
@@ -304,7 +305,12 @@ func NewRouter(db *sql.DB) http.Handler {
 				return
 			}
 		}
-		v, total, e := shipments.List(models.ShipmentFilters{Search: q.Get("search"), Status: status, CarrierID: carrier}, page, size)
+		risk := q.Get("risk_level")
+		if risk != "" && risk != "LOW" && risk != "MEDIUM" && risk != "HIGH" {
+			writeJSONError(w, 400, "Invalid risk filter")
+			return
+		}
+		v, total, e := shipments.List(models.ShipmentFilters{Search: q.Get("search"), Status: status, CarrierID: carrier, RiskLevel: risk}, page, size)
 		respond(w, paginated(v, total, page, size), e, 200)
 	})
 	admin("POST /api/shipments", func(w http.ResponseWriter, r *http.Request) {
@@ -394,6 +400,36 @@ func NewRouter(db *sql.DB) http.Handler {
 		}
 		v, e := shipments.GetEvents(id)
 		respond(w, v, e, 201)
+	})
+	admin("GET /api/shipments/{id}/prediction", func(w http.ResponseWriter, r *http.Request) {
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
+		v, e := shipments.Predict(id)
+		respond(w, v, e, 200)
+	})
+	admin("GET /api/dashboard/summary", func(w http.ResponseWriter, r *http.Request) { v, e := dashboard.GetSummary(); respond(w, v, e, 200) })
+	admin("GET /api/dashboard/risk-summary", func(w http.ResponseWriter, r *http.Request) {
+		v, e := dashboard.GetRiskSummary()
+		respond(w, v, e, 200)
+	})
+	admin("GET /api/dashboard/charts/status", func(w http.ResponseWriter, r *http.Request) {
+		v, e := dashboard.GetStatusDistribution()
+		respond(w, v, e, 200)
+	})
+	admin("GET /api/dashboard/charts/carriers", func(w http.ResponseWriter, r *http.Request) {
+		v, e := dashboard.GetCarrierPerformance()
+		respond(w, v, e, 200)
+	})
+	admin("GET /api/dashboard/charts/risk", func(w http.ResponseWriter, r *http.Request) {
+		v, e := dashboard.GetRiskDistribution()
+		respond(w, v, e, 200)
+	})
+	admin("GET /api/dashboard/charts/performance", func(w http.ResponseWriter, r *http.Request) {
+		weeks := positive(r.URL.Query().Get("weeks"), 8, 52)
+		v, e := dashboard.GetPerformanceTrend(weeks)
+		respond(w, v, e, 200)
 	})
 	outer.Handle("/", mux)
 	return outer

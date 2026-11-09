@@ -12,8 +12,8 @@ import { useState } from 'react';
 import { Badge,Button } from '../components/ui';
 import { Card,CardBody,CardHeader } from '../components/ui/Card';
 import { shipmentsApi } from '../services/api';
-import type { ShipmentDetail,ShipmentStatus } from '../types';
-import { cn,formatDateTime,getPriorityBadgeClass,getStatusBadgeClass,getStatusLabel } from '../utils/helpers';
+import type { PredictionResponse,ShipmentDetail,ShipmentStatus } from '../types';
+import { cn,formatDateTime,getPriorityBadgeClass,getRiskColor,getStatusBadgeClass,getStatusLabel } from '../utils/helpers';
 
 const STATUS_STEPS: { key: ShipmentStatus; label: string; icon: typeof Truck }[] = [
   { key: 'processing', label: 'Processing', icon: Package },
@@ -27,6 +27,7 @@ export function Tracking() {
 
   const [trackingNumber, setTrackingNumber] = useState('');
   const [shipment, setShipment] = useState<ShipmentDetail | null>(null);
+  const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -37,15 +38,18 @@ export function Tracking() {
 
     setError(null);
     setShipment(null);
+    setPrediction(null);
     setIsLoading(true);
     setHasSearched(true);
 
     try {
       const response = await shipmentsApi.track(trackingNumber.trim());
       setShipment(response.data);
+      setPrediction({risk_level:response.data.risk_level || 'LOW',probability:0,method:'rules',reasons:response.data.risk_reasons || ['Current delivery assessment']});
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Shipment not found');
       setShipment(null);
+      setPrediction(null);
     } finally {
       setIsLoading(false);
     }
@@ -54,6 +58,7 @@ export function Tracking() {
   const handleClear = () => {
     setTrackingNumber('');
     setShipment(null);
+    setPrediction(null);
     setError(null);
     setHasSearched(false);
   };
@@ -225,6 +230,61 @@ export function Tracking() {
               </CardBody>
             </Card>
 
+            {/* Risk Prediction */}
+            {(prediction || shipment.status === 'delayed') && (
+              <Card>
+                <CardHeader>
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-warning-500" />
+                    Delay Risk Assessment
+                  </h3>
+                </CardHeader>
+                <CardBody>
+                  {prediction ? (
+                    <div className="space-y-4">
+                      <div
+                        className={cn(
+                          'p-6 rounded-lg text-center',
+                          prediction.risk_level === 'HIGH' && 'bg-danger-50',
+                          prediction.risk_level === 'MEDIUM' && 'bg-warning-50',
+                          prediction.risk_level === 'LOW' && 'bg-success-50'
+                        )}
+                      >
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Current Delay Risk</p>
+                        <p
+                          className="text-4xl font-bold"
+                          style={{ color: getRiskColor(prediction.risk_level) }}
+                        >
+                          {prediction.risk_level}
+                        </p>
+                        <p className="text-2xl font-semibold mt-1" style={{ color: getRiskColor(prediction.risk_level) }}>
+                          Rule-based assessment
+                        </p>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900 mb-2">Why this risk level?</h4>
+                        <ul className="space-y-2">
+                          {prediction.reasons.map((reason, index) => (
+                            <li key={index} className="flex items-start gap-2 text-sm text-gray-600">
+                              <span className="w-1.5 h-1.5 rounded-full mt-1.5" style={{ backgroundColor: getRiskColor(prediction.risk_level) }} />
+                              {reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ) : shipment.status === 'delayed' ? (
+                    <div className="p-6 rounded-lg bg-danger-50 text-center">
+                      <AlertTriangle className="w-12 h-12 text-danger-500 mx-auto mb-3" />
+                      <h4 className="text-lg font-semibold text-danger-600">Shipment Delayed</h4>
+                      <p className="text-gray-600 mt-1">This shipment has been marked as delayed. Please contact the carrier for more information.</p>
+                    </div>
+                  ) : null}
+                </CardBody>
+              </Card>
+            )}
+
             {/* Status Timeline */}
             <Card>
               <CardHeader>
@@ -276,7 +336,7 @@ export function Tracking() {
                           {(eventLocation || eventDesc) && (
                             <p className="text-sm text-gray-400 mt-0.5">
                               {eventLocation && <span className="font-medium">{eventLocation}</span>}
-                              {eventLocation && eventDesc && <span className="mx-1">•</span>}
+                              {eventLocation && eventDesc && <span className="mx-1">â€¢</span>}
                               {eventDesc && <span>{eventDesc}</span>}
                             </p>
                           )}
@@ -361,7 +421,7 @@ export function Tracking() {
             <CardBody className="p-12 text-center">
               <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Enter a tracking number</h3>
-              <p className="text-gray-500">Find your shipment status, and expected delivery</p>
+              <p className="text-gray-500">Find your shipment status, expected delivery, and delay risk assessment</p>
             </CardBody>
           </Card>
         )}

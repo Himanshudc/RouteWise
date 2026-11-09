@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"routewise/internal/models"
+	"routewise/internal/risk"
 	"strings"
 	"time"
 )
@@ -73,6 +74,11 @@ func (s *ShipmentService) GetByID(id int) (*models.Shipment, error) {
 	if err != nil {
 		return nil, err
 	}
+	p := s.score(sh)
+	sh.RiskLevel = p.RiskLevel
+	sh.RiskProbability = p.Probability
+	sh.RiskMethod = p.Method
+	sh.RiskReasons = p.Reasons
 	return sh, nil
 }
 func (s *ShipmentService) GetByTrackingNumber(number string) (*models.Shipment, error) {
@@ -106,6 +112,7 @@ func (s *ShipmentService) List(f models.ShipmentFilters, page, size int) ([]mode
 	if err != nil {
 		return nil, 0, err
 	}
+	// Close the result before querying events through the same connection pool.
 	all := []models.Shipment{}
 	for rows.Next() {
 		sh, e := scanShipment(rows)
@@ -120,7 +127,20 @@ func (s *ShipmentService) List(f models.ShipmentFilters, page, size int) ([]mode
 	if err != nil {
 		return nil, 0, err
 	}
-	total := len(all)
+	filtered := []models.Shipment{}
+	for _, sh := range all {
+		sh.Events, err = s.GetEvents(sh.ID)
+		if err != nil {
+			return nil, 0, err
+		}
+		p := s.score(&sh)
+		sh.RiskLevel = p.RiskLevel
+		sh.RiskProbability = p.Probability
+		if f.RiskLevel == "" || sh.RiskLevel == f.RiskLevel {
+			filtered = append(filtered, sh)
+		}
+	}
+	total := len(filtered)
 	start := (page - 1) * size
 	if start > total {
 		start = total
@@ -129,7 +149,7 @@ func (s *ShipmentService) List(f models.ShipmentFilters, page, size int) ([]mode
 	if end > total {
 		end = total
 	}
-	return all[start:end], total, nil
+	return filtered[start:end], total, nil
 }
 func validPriority(p string) bool { return p == "low" || p == "normal" || p == "high" }
 func (s *ShipmentService) Create(cust, carrier, route int, weight float64, priority, tracking string, expected time.Time) (*models.Shipment, error) {
@@ -276,4 +296,50 @@ func (s *ShipmentService) GetEvents(id int) ([]models.ShipmentEvent, error) {
 		events = append(events, e)
 	}
 	return events, rows.Err()
+}
+func (s *ShipmentService) score(sh *models.Shipment) risk.Prediction {
+	if sh.Status == models.StatusDelayed {
+		return risk.Prediction{RiskLevel: "HIGH", Reasons: []string{"Shipment has been marked delayed"}, Method: "rules"}
+	}
+	active := sh.Status == models.StatusDispatched || sh.Status == models.StatusInTransit || sh.Status == models.StatusOutForDelivery || sh.Status == models.StatusDelayed
+	if !active {
+		return risk.Prediction{RiskLevel: "LOW", Reasons: []string{"Shipment is not in transit"}, Method: "rules"}
+	}
+	hours := 0.0
+	for _, e := range sh.Events {
+		if e.Status == models.StatusDispatched {
+			hours = time.Since(e.Timestamp).Hours()
+			break
+		}
+	}
+	priority := 1
+	if sh.Priority == models.PriorityLow {
+		priority = 0
+	}
+	if sh.Priority == models.PriorityHigh {
+		priority = 2
+	}
+	features := risk.Features{DistanceKm: sh.Route.DistanceKm, PackageWeight: sh.PackageWeight, CarrierDelayRate: sh.Carrier.HistoricalDelayRate,
+		EstimatedHours: sh.Route.EstimatedHours, CurrentTransitHours: hours, DayOfWeek: (int(time.Now().UTC().Weekday()) + 6) % 7, Priority: priority}
+	assessment := risk.Rules(features)
+	remaining := time.Until(sh.ExpectedDelivery)
+	if remaining <= 0 {
+		return risk.Prediction{RiskLevel: "HIGH", Reasons: []string{"Expected delivery time has passed"}, Method: "rules"}
+	}
+	if assessment.RiskLevel == "HIGH" {
+		assessment.RiskLevel = "MEDIUM"
+		assessment.Reasons = []string{"Transit time exceeds the route estimate, but delivery is not overdue"}
+	} else if remaining.Hours() <= float64(sh.Route.EstimatedHours)*0.2 {
+		assessment.RiskLevel = "MEDIUM"
+		assessment.Reasons = []string{"Expected delivery time is approaching"}
+	}
+	return assessment
+}
+func (s *ShipmentService) Predict(id int) (*models.ShipmentPrediction, error) {
+	sh, err := s.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	p := s.score(sh)
+	return &models.ShipmentPrediction{Shipment: sh, RiskLevel: p.RiskLevel, Probability: p.Probability, Reasons: p.Reasons, Method: p.Method}, nil
 }

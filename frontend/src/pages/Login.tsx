@@ -29,7 +29,7 @@ export function Login() {
   };
 
   if (isAuthenticated) {
-    return <Navigate to={isAdmin ? "/shipments" : "/track"} replace />;
+    return <Navigate to={isAdmin ? "/dashboard" : "/track"} replace />;
   }
 
   return (

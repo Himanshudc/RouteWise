@@ -3,13 +3,19 @@ import type {
 Carrier,
 CarrierCreate,
 CarrierPerformance,
+CarrierPerformanceChart,
 CarrierUpdate,
 Customer,
 CustomerCreate,
 CustomerUpdate,
+DashboardSummary,
 LoginRequest,
 PaginatedResponse,
+PerformanceChart,
+PredictionResponse,
 RegisterRequest,
+RiskDistributionChart,
+RiskSummary,
 Route,
 RouteCreate,
 RouteUpdate,
@@ -19,6 +25,7 @@ ShipmentFilters,
 ShipmentListItem,
 ShipmentStatusUpdate,
 ShipmentUpdate,
+StatusDistributionChart,
 Token,
 User,
 } from '../types';
@@ -107,6 +114,18 @@ export const shipmentsApi = {
     api.put<ShipmentDetail>(`/shipments/${id}/status`, data),
   addEvent: (id: number, data: ShipmentStatusUpdate) =>
     api.post(`/shipments/${id}/events`, data),
+  getPrediction: (id: number) => api.get<PredictionResponse>(`/shipments/${id}/prediction`),
+};
+
+// Dashboard
+export const dashboardApi = {
+  getSummary: () => api.get<DashboardSummary>('/dashboard/summary'),
+  getRiskSummary: () => api.get<RiskSummary>('/dashboard/risk-summary'),
+  getStatusChart: () => api.get<StatusDistributionChart>('/dashboard/charts/status'),
+  getPerformanceChart: (weeks = 8) =>
+    api.get<PerformanceChart>('/dashboard/charts/performance', { params: { weeks } }),
+  getCarrierChart: () => api.get<CarrierPerformanceChart>('/dashboard/charts/carriers'),
+  getRiskChart: () => api.get<RiskDistributionChart>('/dashboard/charts/risk'),
 };
 
 export default api;

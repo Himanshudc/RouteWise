@@ -19,7 +19,7 @@ func TestPublicAndProtectedRoutes(t *testing.T) {
 	for _, tc := range []struct {
 		method, path string
 		want         int
-	}{{"GET", "/health", 200}, {"GET", "/api/shipments", 401}, {"GET", "/api/dashboard/summary", 404}, {"DELETE", "/health", 405}} {
+	}{{"GET", "/health", 200}, {"GET", "/api/shipments", 401}, {"GET", "/api/dashboard/summary", 401}, {"DELETE", "/health", 405}} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest(tc.method, tc.path, nil))
 		if w.Code != tc.want {
@@ -112,7 +112,6 @@ ALTER TABLE routes ALTER COLUMN created_at DROP DEFAULT;
 		}
 	}
 	t.Setenv("SECRET_KEY", "integration-test-key-at-least-thirty-two-characters")
-	t.Setenv("ENABLE_ML", "false")
 	handler := NewRouter(db)
 	request := func(method, path string, body interface{}, token string, want int) map[string]interface{} {
 		t.Helper()
@@ -144,8 +143,14 @@ ALTER TABLE routes ALTER COLUMN created_at DROP DEFAULT;
 	request("POST", "/api/auth/register", map[string]string{"name": "Customer", "email": "new@example.com", "password": "password123", "role": "admin"}, "", 201)
 	customerLogin := request("POST", "/api/auth/login", map[string]string{"email": "new@example.com", "password": "password123"}, "", 200)
 	customerToken := customerLogin["access_token"].(string)
-	for _, path := range []string{"/api/shipments", "/api/shipments/1", "/api/customers"} {
+	for _, path := range []string{"/api/shipments", "/api/shipments/1", "/api/dashboard/summary", "/api/customers"} {
 		request("GET", path, nil, customerToken, 403)
+	}
+	risk := request("GET", "/api/dashboard/risk-summary", nil, token, 200)
+	for _, level := range []string{"low", "medium", "high"} {
+		if count, ok := risk[level].(float64); !ok || count < 1 {
+			t.Fatalf("fresh demo has no %s risk shipments: %v", level, risk)
+		}
 	}
 	customer := request("POST", "/api/customers", map[string]string{"name": "Test Customer", "city": "Kathmandu"}, token, 201)
 	carrier := request("POST", "/api/carriers", map[string]interface{}{"name": "Test Carrier", "code": "TEST", "historical_delay_rate": .1}, token, 201)
@@ -198,10 +203,10 @@ ALTER TABLE routes ALTER COLUMN created_at DROP DEFAULT;
 		t.Fatal("public data leak")
 	}
 	request("GET", "/api/shipments/tracking/UNKNOWN", nil, "", 404)
-	for _, query := range []string{"?status=delivered", "?carrier_id=" + fmt.Sprint(int(carrier["id"].(float64))), "?search=Updated%20Customer", "?status=delivered&search=Updated%20Customer", "?page=1000"} {
+	for _, query := range []string{"?status=delivered", "?carrier_id=" + fmt.Sprint(int(carrier["id"].(float64))), "?search=Updated%20Customer", "?risk_level=LOW", "?status=delivered&search=Updated%20Customer", "?page=1000"} {
 		request("GET", "/api/shipments"+query, nil, token, 200)
 	}
-	for _, endpoint := range []string{"/health", "/ready", "/api/customers", "/api/carriers", "/api/routes"} {
+	for _, endpoint := range []string{"/health", "/ready", "/api/customers", "/api/carriers", "/api/routes", "/api/dashboard/summary", "/api/dashboard/risk-summary", "/api/dashboard/charts/status", "/api/dashboard/charts/performance", "/api/dashboard/charts/carriers", "/api/dashboard/charts/risk", path + "/prediction"} {
 		request("GET", endpoint, nil, token, 200)
 	}
 	request("POST", "/api/carriers", map[string]interface{}{"name": "Duplicate", "code": "TEST", "historical_delay_rate": .1}, token, 409)

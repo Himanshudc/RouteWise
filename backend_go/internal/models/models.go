@@ -84,6 +84,12 @@ type Shipment struct {
 	Carrier  *Carrier        `json:"carrier,omitempty"`
 	Route    *Route          `json:"route,omitempty"`
 	Events   []ShipmentEvent `json:"events,omitempty"`
+
+	// Prediction fields
+	RiskMethod      string   `json:"risk_method,omitempty"`
+	RiskReasons     []string `json:"risk_reasons,omitempty"`
+	RiskLevel       string   `json:"risk_level,omitempty"`
+	RiskProbability float64  `json:"risk_probability,omitempty"`
 }
 
 // ShipmentEvent represents the shipment_events table.
@@ -113,7 +119,16 @@ type ShipmentFilters struct {
 	Status     string
 	CarrierID  int
 	CustomerID int
+	RiskLevel  string
+	Page       int
+	PageSize   int
+}
 
-	Page     int
-	PageSize int
+// ShipmentPrediction combines shipment details with ML prediction.
+type ShipmentPrediction struct {
+	Method      string    `json:"method"`
+	Shipment    *Shipment `json:"shipment"`
+	RiskLevel   string    `json:"risk_level"`
+	Probability float64   `json:"probability"`
+	Reasons     []string  `json:"reasons"`
 }
