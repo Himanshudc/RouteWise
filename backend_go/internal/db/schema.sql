@@ -61,8 +61,20 @@ CREATE TABLE IF NOT EXISTS shipment_events (
     description TEXT
 );
 
+CREATE TABLE IF NOT EXISTS alerts (
+    id SERIAL PRIMARY KEY,
+    shipment_id INTEGER NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+    type VARCHAR(30) NOT NULL,
+    message TEXT NOT NULL,
+    is_acknowledged BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    acknowledged_at TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status);
 CREATE INDEX IF NOT EXISTS idx_shipments_tracking ON shipments(tracking_number);
 CREATE INDEX IF NOT EXISTS idx_shipments_customer ON shipments(customer_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_carrier ON shipments(carrier_id);
 CREATE INDEX IF NOT EXISTS idx_shipment_events_shipment ON shipment_events(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_shipment ON alerts(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_unacknowledged ON alerts(is_acknowledged);

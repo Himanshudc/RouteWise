@@ -1,5 +1,6 @@
 import axios,{ AxiosError,InternalAxiosRequestConfig } from 'axios';
 import type {
+Alert,
 Carrier,
 CarrierCreate,
 CarrierPerformance,
@@ -126,6 +127,15 @@ export const dashboardApi = {
     api.get<PerformanceChart>('/dashboard/charts/performance', { params: { weeks } }),
   getCarrierChart: () => api.get<CarrierPerformanceChart>('/dashboard/charts/carriers'),
   getRiskChart: () => api.get<RiskDistributionChart>('/dashboard/charts/risk'),
+  getRecentAlerts: (limit = 5) =>
+    api.get<Alert[]>('/dashboard/alerts/recent', { params: { limit } }),
+};
+
+// Alerts
+export const alertsApi = {
+  list: (params?: { unacknowledged_only?: boolean; page?: number; page_size?: number }) =>
+    api.get<PaginatedResponse<Alert>>('/alerts', { params }),
+  acknowledge: (id: number) => api.put<Alert>(`/alerts/${id}/acknowledge`),
 };
 
 export default api;

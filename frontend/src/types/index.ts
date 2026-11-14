@@ -217,6 +217,18 @@ export interface PredictionResponse {
   reasons: string[];
 }
 
+// Alert
+export interface Alert {
+  id: number;
+  shipment_id: number;
+  type: 'high_risk' | 'overdue' | 'delayed';
+  message: string;
+  is_acknowledged: boolean;
+  created_at: string;
+  acknowledged_at?: string;
+  shipment_tracking_number?: string;
+}
+
 // Dashboard
 export interface DashboardSummary {
   total_shipments: number;

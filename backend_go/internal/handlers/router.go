@@ -25,6 +25,7 @@ func NewRouter(db *sql.DB) http.Handler {
 	carriers := services.NewCarrierService(db)
 	routes := services.NewRouteService(db)
 	shipments := services.NewShipmentService(db)
+	alerts := services.NewAlertService(db)
 	dashboard := services.NewDashboardService(db)
 	mux := http.NewServeMux()
 	admin := func(pattern string, handler http.HandlerFunc) {
@@ -409,6 +410,19 @@ func NewRouter(db *sql.DB) http.Handler {
 		v, e := shipments.Predict(id)
 		respond(w, v, e, 200)
 	})
+	admin("GET /api/alerts", func(w http.ResponseWriter, r *http.Request) {
+		page, size := pagination(r)
+		v, total, e := alerts.List(r.URL.Query().Get("unacknowledged_only") == "true", page, size)
+		respond(w, paginated(v, total, page, size), e, 200)
+	})
+	admin("PUT /api/alerts/{id}/acknowledge", func(w http.ResponseWriter, r *http.Request) {
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
+		v, e := alerts.Acknowledge(id)
+		respond(w, v, e, 200)
+	})
 	admin("GET /api/dashboard/summary", func(w http.ResponseWriter, r *http.Request) { v, e := dashboard.GetSummary(); respond(w, v, e, 200) })
 	admin("GET /api/dashboard/risk-summary", func(w http.ResponseWriter, r *http.Request) {
 		v, e := dashboard.GetRiskSummary()
@@ -429,6 +443,11 @@ func NewRouter(db *sql.DB) http.Handler {
 	admin("GET /api/dashboard/charts/performance", func(w http.ResponseWriter, r *http.Request) {
 		weeks := positive(r.URL.Query().Get("weeks"), 8, 52)
 		v, e := dashboard.GetPerformanceTrend(weeks)
+		respond(w, v, e, 200)
+	})
+	admin("GET /api/dashboard/alerts/recent", func(w http.ResponseWriter, r *http.Request) {
+		limit := positive(r.URL.Query().Get("limit"), 5, 100)
+		v, _, e := alerts.List(true, 1, limit)
 		respond(w, v, e, 200)
 	})
 	outer.Handle("/", mux)

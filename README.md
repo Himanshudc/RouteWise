@@ -1,6 +1,6 @@
-# RouteWise v0.2
+# RouteWise v0.3
 
-RouteWise is a local logistics demo built with Go, PostgreSQL, React, and Docker Compose. This release adds an operations dashboard and rule-based shipment risk to the shipment workflow.
+RouteWise is a local logistics demo built with Go, PostgreSQL, React, and Docker Compose. This release adds delay alerts to the shipment workflow and operations dashboard.
 
 - Admins manage customers, carriers, routes, and shipments.
 - Status updates validate transitions and record tracking events in the same transaction.
@@ -41,4 +41,4 @@ The API readiness check is [available on port 8001](http://localhost:8001/ready)
 
 ## Release scope
 
-v0.2 adds the dashboard and explainable risk rules. Delay alerts are planned for a later release.
+Admins can open **Alerts** from the sidebar or notification bell. RouteWise checks for overdue or explicitly delayed shipments when alerts are loaded, records each alert type once per shipment, and lets admins acknowledge alerts. The dashboard shows the most recent alerts.

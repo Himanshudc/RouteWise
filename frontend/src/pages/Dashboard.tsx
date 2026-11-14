@@ -2,12 +2,13 @@ import { AlertTriangle,Clock,PackageCheck,RefreshCw,Truck } from 'lucide-react';
 import { useEffect,useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CarrierChart,PerformanceChart,RiskChart,StatusChart } from '../components/charts';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card,CardBody } from '../components/ui/Card';
 import { useAuth } from '../context/AuthContext';
 import { dashboardApi } from '../services/api';
-import type { DashboardSummary,RiskSummary } from '../types';
-import { cn } from '../utils/helpers';
+import type { Alert,DashboardSummary,RiskSummary } from '../types';
+import { cn,formatRelativeTime } from '../utils/helpers';
 
 const KPI_CARDS = [
   { key: 'total_shipments', label: 'Total Shipments', icon: Truck, color: 'text-chart-indigo', bg: 'bg-[#F4F6F9]', filter: undefined },
@@ -25,6 +26,7 @@ export function Dashboard() {
   const [performanceChartData, setPerformanceChartData] = useState<{ labels: string[]; on_time_rates: number[] } | null>(null);
   const [carrierChartData, setCarrierChartData] = useState<{ data: { label: string; value: number }[] } | null>(null);
   const [riskChartData, setRiskChartData] = useState<{ data: { label: string; value: number }[] } | null>(null);
+  const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +40,7 @@ export function Dashboard() {
         ['Delivery performance', dashboardApi.getPerformanceChart().then(({ data }) => setPerformanceChartData(data))],
         ['Carrier performance', dashboardApi.getCarrierChart().then(({ data }) => setCarrierChartData(data))],
         ['Risk distribution', dashboardApi.getRiskChart().then(({ data }) => setRiskChartData(data))],
+        ['Recent alerts', dashboardApi.getRecentAlerts().then(({ data }) => setRecentAlerts(data))],
       ] as const;
       const results = await Promise.allSettled(requests.map(([, request]) => request));
       const failed = requests.filter((_, index) => results[index].status === 'rejected');
@@ -164,6 +167,44 @@ export function Dashboard() {
           </CardBody>
         </Card>
 
+        {/* Recent Alerts */}
+        <Card>
+          <CardBody className="p-5 pt-0">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Recent Alerts</h3>
+              <Badge variant="danger">{recentAlerts.length}</Badge>
+            </div>
+            {recentAlerts.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No recent alerts</p>
+            ) : (
+              <div className="space-y-3">
+                {recentAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={cn(
+                      'p-3 rounded-lg border-l-4',
+                      alert.type === 'high_risk' && 'bg-danger-50 border-danger-500',
+                      alert.type === 'overdue' && 'bg-warning-50 border-warning-500',
+                      alert.type === 'delayed' && 'bg-danger-50 border-danger-500'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{alert.message}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {alert.shipment_tracking_number} • {formatRelativeTime(alert.created_at)}
+                        </p>
+                      </div>
+                      {!alert.is_acknowledged && (
+                        <Badge variant="warning" className="text-xs">Unread</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
   );

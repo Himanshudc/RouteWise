@@ -3,6 +3,7 @@ import { Navigate,Route,Routes } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { useAuth } from './context/AuthContext';
+import { Alerts } from './pages/Alerts';
 import { Carriers } from './pages/Carriers';
 import { Customers } from './pages/Customers';
 import { Login } from './pages/Login';
@@ -81,6 +82,7 @@ function App() {
                 <Route path="/customers" element={<ProtectedRoute adminOnly><Customers /></ProtectedRoute>} />
                 <Route path="/carriers" element={<ProtectedRoute adminOnly><Carriers /></ProtectedRoute>} />
                 <Route path="/routes" element={<ProtectedRoute adminOnly><RoutesPage /></ProtectedRoute>} />
+                <Route path="/alerts" element={<ProtectedRoute adminOnly><Alerts /></ProtectedRoute>} />
                 <Route path="/track" element={<Tracking />} />
                 <Route path="/" element={<HomeRedirect />} />
                 <Route path="*" element={<HomeRedirect />} />

@@ -106,12 +106,14 @@ ALTER TABLE users ALTER COLUMN role DROP DEFAULT, ALTER COLUMN role TYPE userrol
 ALTER TABLE customers ALTER COLUMN created_at DROP DEFAULT;
 ALTER TABLE carriers ALTER COLUMN created_at DROP DEFAULT;
 ALTER TABLE routes ALTER COLUMN created_at DROP DEFAULT;
+ALTER TABLE alerts ALTER COLUMN created_at DROP DEFAULT, ALTER COLUMN is_acknowledged DROP DEFAULT;
 `)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	t.Setenv("SECRET_KEY", "integration-test-key-at-least-thirty-two-characters")
+	t.Setenv("ENABLE_ML", "false")
 	handler := NewRouter(db)
 	request := func(method, path string, body interface{}, token string, want int) map[string]interface{} {
 		t.Helper()
@@ -193,6 +195,9 @@ ALTER TABLE routes ALTER COLUMN created_at DROP DEFAULT;
 		if result["created_at"] != initialCreated {
 			t.Fatal("created_at changed")
 		}
+		if status == "delayed" {
+			request("GET", "/api/alerts", nil, token, 200)
+		}
 	}
 	detail := request("GET", path, nil, token, 200)
 	if detail["actual_delivery"] == nil || len(detail["events"].([]interface{})) != 7 {
@@ -206,9 +211,29 @@ ALTER TABLE routes ALTER COLUMN created_at DROP DEFAULT;
 	for _, query := range []string{"?status=delivered", "?carrier_id=" + fmt.Sprint(int(carrier["id"].(float64))), "?search=Updated%20Customer", "?risk_level=LOW", "?status=delivered&search=Updated%20Customer", "?page=1000"} {
 		request("GET", "/api/shipments"+query, nil, token, 200)
 	}
-	for _, endpoint := range []string{"/health", "/ready", "/api/customers", "/api/carriers", "/api/routes", "/api/dashboard/summary", "/api/dashboard/risk-summary", "/api/dashboard/charts/status", "/api/dashboard/charts/performance", "/api/dashboard/charts/carriers", "/api/dashboard/charts/risk", path + "/prediction"} {
+	for _, endpoint := range []string{"/health", "/ready", "/api/customers", "/api/carriers", "/api/routes", "/api/dashboard/summary", "/api/dashboard/risk-summary", "/api/dashboard/charts/status", "/api/dashboard/charts/performance", "/api/dashboard/charts/carriers", "/api/dashboard/charts/risk", "/api/dashboard/alerts/recent", path + "/prediction"} {
 		request("GET", endpoint, nil, token, 200)
 	}
+	firstAlerts := request("GET", "/api/alerts", nil, token, 200)
+	secondAlerts := request("GET", "/api/alerts", nil, token, 200)
+	if firstAlerts["total"] != secondAlerts["total"] {
+		t.Fatal("duplicate alerts")
+	}
+	foundDelayed, foundOverdue := false, false
+	for _, a := range secondAlerts["items"].([]interface{}) {
+		m := a.(map[string]interface{})
+		if m["shipment_id"] == float64(id) && m["type"] == "delayed" {
+			foundDelayed = true
+		}
+		if m["type"] == "overdue" {
+			foundOverdue = true
+		}
+	}
+	if !foundDelayed || !foundOverdue {
+		t.Fatal("missing automatic alerts")
+	}
+	alert := secondAlerts["items"].([]interface{})[0].(map[string]interface{})
+	request("PUT", fmt.Sprintf("/api/alerts/%d/acknowledge", int(alert["id"].(float64))), nil, token, 200)
 	request("POST", "/api/carriers", map[string]interface{}{"name": "Duplicate", "code": "TEST", "historical_delay_rate": .1}, token, 409)
 	request("POST", "/api/routes", map[string]interface{}{"origin": "A", "destination": "B", "distance_km": -1, "estimated_hours": 1}, token, 400)
 	// Verify exact delivery counts/rates rather than only checking successful HTTP responses.

@@ -1,4 +1,5 @@
 import {
+AlertTriangle,
 LayoutDashboard,
 LogOut,
 MapPin,
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { path: '/customers', label: 'Customers', icon: Users, roles: ['admin'] as UserRole[] },
   { path: '/carriers', label: 'Carriers', icon: Ship, roles: ['admin'] as UserRole[] },
   { path: '/routes', label: 'Routes', icon: MapPin, roles: ['admin'] as UserRole[] },
+  { path: '/alerts', label: 'Alerts', icon: AlertTriangle, roles: ['admin'] as UserRole[] },
 ] as const;
 
 export function Sidebar({ sidebarOpen = false, onSidebarClose }: { sidebarOpen?: boolean; onSidebarClose?: () => void }) {

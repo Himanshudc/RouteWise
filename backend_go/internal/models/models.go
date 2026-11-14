@@ -102,6 +102,18 @@ type ShipmentEvent struct {
 	Description *string        `json:"description,omitempty"`
 }
 
+// Alert represents the alerts table.
+type Alert struct {
+	ID                     int        `json:"id"`
+	ShipmentID             int        `json:"shipment_id"`
+	Type                   string     `json:"type"`
+	Message                string     `json:"message"`
+	IsAcknowledged         bool       `json:"is_acknowledged"`
+	CreatedAt              time.Time  `json:"created_at"`
+	AcknowledgedAt         *time.Time `json:"acknowledged_at,omitempty"`
+	ShipmentTrackingNumber *string    `json:"shipment_tracking_number,omitempty"`
+}
+
 // ValidTransitions defines allowed status transitions.
 var ValidTransitions = map[ShipmentStatus][]ShipmentStatus{
 	StatusProcessing:     {StatusDispatched, StatusCancelled},
